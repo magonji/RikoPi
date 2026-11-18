@@ -1,0 +1,25 @@
+[project]
+name = "rikopi"
+version = "0.1.0"
+description = "Adquisición OKE (pump-probe con lock-in SR810 y stage Newport XPS). Sustituye a Riko v5 (LabVIEW)."
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "pyserial>=3.5",
+    "pyqtgraph>=0.13",
+    "PySide6>=6.5",
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.scripts]
+rikopi = "rikopi.__main__:main"
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["rikopi*"]

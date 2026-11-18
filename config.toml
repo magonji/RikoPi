@@ -1,0 +1,32 @@
+# Configuración de hardware de RikoPi (equivale a la sección [Comm] de Riko v5.ini)
+# Este fichero no lo modifica el programa. Los ajustes de barrido y el t0 que se fijen desde
+# la interfaz se guardan en state.json (en esta misma carpeta).
+
+simulate = false          # true = sin hardware (también: rikopi --sim)
+data_dir = "~/OKEdata"    # carpeta por defecto para los datos
+
+[stage]                   # Newport XPS
+host = "192.168.0.254"    # XPSaddr
+port = 5001
+group = "Group1"          # Axis = Group1/-  en Riko v5.ini
+positioner = "Group1.Pos" # comprobar el nombre en la web del XPS (System > Groups)
+reversed = true           # el '/-' de Axis
+passes = 1                # 2 si es doble paso ('/x2')
+t0_mm = 0.0               # posición (mm, la que muestra el XPS) del cero de tiempos -> recalibrar
+# min_mm = -120           # límites opcionales más estrictos que los del controlador
+# max_mm = 120
+# velocity = 50           # mm/s (opcional, PositionerSGammaParametersSet)
+
+[lockin]                  # SR810 por RS232
+port = "COM3"             # Windows: COM3, COM4… (Administrador de dispositivos)
+                          # Linux: "/dev/ttyUSB0"   Mac: "/dev/tty.usbserial-XXXX"
+baudrate = 9600           # debe coincidir con el panel del SR810 (SETUP → RS232). 19200 es más rápido
+rtscts = false            # control de flujo por hardware; actívalo si se pierden caracteres
+invert = false            # invierte el signo de X
+
+[chopper]                        # SR810slowChop: bajar el chopper tras medir
+slow_after_scan = true           # 10 min después de terminar, pone la referencia del SR810 a slow_Hz
+delay_min = 10
+slow_Hz = 120
+restore_on_start = true          # al empezar el siguiente barrido vuelve a la frecuencia anterior
+spinup_s = 10                    # espera para que el chopper recupere la velocidad
