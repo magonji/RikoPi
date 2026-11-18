@@ -1,4 +1,4 @@
-"""Ajuste de la autocorrelación (equivale a CorrFit.vi): da el cero de tiempos y la duración del pulso."""
+"""Autocorrelation fit (equivalent to CorrFit.vi): gives time zero and the pulse duration."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -6,13 +6,13 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.optimize import curve_fit
 
-# Cociente FWHM(autocorrelación)/FWHM(pulso)
+# Ratio FWHM(autocorrelation)/FWHM(pulse)
 DECONV = {"sech2": 1.5427, "gauss": 1.4142}
-SECH_FWHM = 1.762747  # FWHM de sech^2(t/tau) en unidades de tau
+SECH_FWHM = 1.762747  # FWHM of sech^2(t/tau) in units of tau
 
 
 def ac_sech2(t, A, t0, tau, B):
-    """Autocorrelación de intensidad de un pulso sech^2(t/tau)."""
+    """Intensity autocorrelation of a sech^2(t/tau) pulse."""
     x = np.asarray((t - t0) / tau, dtype=float)
     out = np.ones_like(x)
     m = np.abs(x) > 1e-3
@@ -23,7 +23,7 @@ def ac_sech2(t, A, t0, tau, B):
 
 
 def ac_gauss(t, A, t0, w, B):
-    """Autocorrelación gaussiana con FWHM w."""
+    """Gaussian autocorrelation with FWHM w."""
     return A * np.exp(-4 * np.log(2) * ((t - t0) / w) ** 2) + B
 
 
@@ -39,7 +39,7 @@ class FitResult:
 
     def summary(self) -> str:
         return (f"{self.model}: t0 = {self.t0_ps * 1000:.1f} fs, FWHM AC = {self.ac_fwhm_fs:.1f} fs, "
-                f"pulso = {self.pulse_fwhm_fs:.1f} fs")
+                f"pulse = {self.pulse_fwhm_fs:.1f} fs")
 
 
 def fit_autocorrelation(t_ps, y, model: str = "sech2", window_ps: float | None = 1.0) -> FitResult:

@@ -1,8 +1,8 @@
-"""Configuración (sustituye a Riko v5.ini).
+"""Configuration (replaces Riko v5.ini).
 
-* config.toml : hardware, editado a mano, el programa nunca lo sobrescribe.
-* state.json  : últimos ajustes de barrido, t0 y ruta de datos; lo guarda la interfaz al cerrar
-                (como hacía Riko con el .ini). Su t0_mm tiene prioridad sobre el de config.toml.
+* config.toml : hardware, edited by hand; the program never overwrites it.
+* state.json  : last scan settings, t0 and data path; saved by the interface on closing
+                (as Riko did with the .ini). Its t0_mm takes precedence over the one in config.toml.
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ class Config:
     lockin: dict = field(default_factory=dict)
     data_dir: str = "~/OKEdata"
     path: Path = DEFAULT_CONFIG
-    raw: dict = field(default_factory=dict)   # resto de secciones (p.ej. chopper)
+    raw: dict = field(default_factory=dict)   # remaining sections (e.g. chopper)
 
     def section(self, name: str) -> dict:
         return self.raw.get(name, {})
@@ -60,14 +60,14 @@ def load(path: str | Path | None = None) -> Config:
 
 
 def connect(cfg: Config, simulate: bool | None = None):
-    """Abre la stage XPS y el lock-in SR810. Devuelve (stage, lockin, delay_line, simulated)."""
+    """Opens the XPS stage and the SR810 lock-in. Returns (stage, lockin, delay_line, simulated)."""
     sim = cfg.simulate if simulate is None else simulate
     delay = cfg.delay_line()
     s, l = cfg.stage, cfg.lockin
     if sim:
         from .instruments.sim import SimSR810, SimXPS
         stage = SimXPS()
-        # copia: el cero 'físico' simulado no cambia aunque el usuario mueva t0
+        # copy: the simulated 'physical' time zero does not move when the user changes t0
         lockin = SimSR810(stage, replace(delay), invert=l.get("invert", False))
     else:
         from .instruments.xps import XPS
@@ -78,10 +78,10 @@ def connect(cfg: Config, simulate: bool | None = None):
             stage.set_velocity(s["velocity"], s.get("acceleration", 4 * s["velocity"]))
         from .instruments.sr810 import SR810
         if "port" not in l:
-            raise ValueError("falta [lockin] port en config.toml (puerto serie del SR810, p.ej. COM3)")
+            raise ValueError("[lockin] port is missing in config.toml (serial port of the SR810, e.g. COM3)")
         lockin = SR810.serial(l["port"], l.get("baudrate", 9600), l.get("rtscts", False),
                               invert=l.get("invert", False))
-        lockin.idn()  # comprueba la comunicación (SR810startup.vi)
+        lockin.idn()  # checks communication (SR810startup.vi)
     lo, hi = stage.travel_limits()
     delay.min_mm = max(lo, s.get("min_mm", lo))
     delay.max_mm = min(hi, s.get("max_mm", hi))

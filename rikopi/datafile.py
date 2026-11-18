@@ -1,9 +1,9 @@
-"""Escritura/lectura de ficheros de datos (sustituye a FilePrep / xXYYheader / MakexXlgYYYarray).
+"""Writing/reading data files (replaces FilePrep / xXYYheader / MakexXlgYYYarray).
 
-Formato: texto plano, cabecera con líneas que empiezan por '#', después columnas separadas por
-tabuladores:  t_fs  rep1  rep2 ...  repN  avg
-Se lee directamente con numpy.loadtxt(path) o pandas.read_csv(path, sep='\\t', comment='#').
-La penúltima línea de la cabecera contiene todos los ajustes en JSON (para recargar un barrido).
+Format: plain text, a header of lines starting with '#', then tab-separated columns:
+    t_fs  rep1  rep2 ...  repN  avg
+Can be read directly with numpy.loadtxt(path) or pandas.read_csv(path, sep='\\t', comment='#').
+The last-but-one header line holds all the settings as JSON (to reload a scan).
 """
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from .scan import ScanData, ScanSettings, sens_summary
 
 
 def unique_path(path: str | os.PathLike) -> Path:
-    """Si el fichero existe, añade _2, _3, ... (nunca se sobrescriben datos)."""
+    """If the file exists, appends _2, _3, ... (data are never overwritten)."""
     p = Path(path)
     if not p.exists():
         return p
@@ -49,11 +49,11 @@ def write(path: str | os.PathLike, data: ScanData, settings: ScanSettings, extra
     tmp = p.with_suffix(p.suffix + ".tmp")
     np.savetxt(tmp, np.column_stack(cols), fmt="%.6g", delimiter="\t",
                header="\n".join(header), comments="# ")
-    os.replace(tmp, p)  # escritura atómica: el fichero nunca queda a medias
+    os.replace(tmp, p)  # atomic write: the file is never left half-written
 
 
 def read(path: str | os.PathLike) -> tuple[np.ndarray, np.ndarray, dict]:
-    """Devuelve (t_ps, datos_mV[reps, n], meta)."""
+    """Returns (t_ps, data_mV[reps, n], meta)."""
     meta = {}
     with open(path) as f:
         for line in f:

@@ -1,12 +1,12 @@
-"""Definición y ejecución de un barrido pump-probe (equivale al modo 'Riko' de Riko v5 + Smpl.vi).
+"""Definition and execution of a pump-probe scan (equivalent to the 'Riko' mode of Riko v5 + Smpl.vi).
 
-Para cada repetición, en cada punto de retardo:
-  1. si toca, cambia la sensibilidad del lock-in (y espera un tiempo extra para que se asiente)
-  2. mueve la stage (con un pequeño desplazamiento aleatorio si 'jitter' está activo)
-  3. espera 'wait_ms'
-  4. lee X del lock-in (en mV)
-Al final de cada repetición se corrige el jitter interpolando y se guarda el fichero completo
-(como el original, para no perder datos si se cuelga el ordenador).
+For each repeat, at each delay point:
+  1. if required, change the lock-in sensitivity (and wait a little longer for it to settle)
+  2. move the stage (with a small random offset if 'jitter' is on)
+  3. wait 'wait_ms'
+  4. read X from the lock-in (in mV)
+At the end of each repeat the jitter is corrected by interpolation and the whole file is saved
+(as in the original, so that no data are lost if the computer crashes).
 """
 from __future__ import annotations
 
@@ -28,13 +28,13 @@ class Zone:
     start_ps: float
     end_ps: float
     step_fs: float
-    log: bool = False   # si True: paso creciente geométricamente; step_fs es el primer paso (start_ps > 0)
+    log: bool = False   # if True: geometrically increasing step; step_fs is the first step (start_ps > 0)
 
 
 @dataclass
 class SensStep:
-    from_ps: float      # a partir de este retardo se usa esta sensibilidad
-    sens: str           # p.ej. "50 mV"
+    from_ps: float      # this sensitivity is used from this delay onwards
+    sens: str           # e.g. "50 mV"
 
 
 @dataclass
@@ -44,9 +44,9 @@ class ScanSettings:
     sens: list[SensStep] = field(default_factory=lambda: [SensStep(float("-inf"), "50 mV")])
     reps: int = 8
     wait_ms: float = 200
-    sens_extra_wait_ms: float = 1000   # espera adicional tras cambiar la sensibilidad
+    sens_extra_wait_ms: float = 1000   # extra wait after changing the sensitivity
     jitter: bool = True
-    jitter_nm: float = 400             # amplitud máx. del jitter de la stage (±), como Jitr.vi
+    jitter_nm: float = 400             # max. amplitude of the stage jitter (±), as in Jitr.vi
     pause_between_reps_s: float = 0
     notes: str = ""
 
@@ -63,16 +63,16 @@ class ScanSettings:
 
 
 def time_grid(zones: list[Zone]) -> np.ndarray:
-    """Vector de retardos (ps) a partir de las zonas. Elimina puntos duplicados en las fronteras."""
+    """Array of delays (ps) built from the zones. Removes duplicate points at the boundaries."""
     pts: list[float] = []
     for z in zones:
         a, b = float(z.start_ps), float(z.end_ps)
         step = z.step_fs / 1000.0
         if b <= a or step <= 0:
-            raise ValueError(f"zona inválida: {z}")
+            raise ValueError(f"invalid zone: {z}")
         if z.log:
             if a <= 0:
-                raise ValueError(f"una zona logarítmica debe empezar en t > 0: {z}")
+                raise ValueError(f"a logarithmic zone must start at t > 0: {z}")
             r = 1 + step / a
             n = math.ceil(math.log(b / a) / math.log(r))
             pts.extend(a * r ** np.arange(n))
@@ -80,7 +80,7 @@ def time_grid(zones: list[Zone]) -> np.ndarray:
             n = int(math.floor((b - a) / step + 1e-9))
             pts.extend(a + step * np.arange(n + 1))
         pts.append(b)
-    t = np.unique(np.round(np.asarray(pts), 6))  # redondeo a 1 as para fusionar duplicados
+    t = np.unique(np.round(np.asarray(pts), 6))  # round to 1 as to merge duplicates
     return t
 
 
@@ -100,8 +100,8 @@ def estimate_duration_s(settings: ScanSettings, move_s: float = 0.05) -> float:
 
 @dataclass
 class ScanData:
-    t_ps: np.ndarray                # retardos nominales
-    data_mV: np.ndarray             # (reps, n) con NaN donde aún no se ha medido
+    t_ps: np.ndarray                # nominal delays
+    data_mV: np.ndarray             # (reps, n) with NaN where not yet measured
     reps_done: int = 0
 
     @property
@@ -112,7 +112,7 @@ class ScanData:
 
 
 class Scan:
-    """Ejecuta el barrido. Pensado para correr en un hilo; se detiene con stop()."""
+    """Runs the scan. Meant to run in a thread; stopped with stop()."""
 
     def __init__(self, stage, lockin, delay: DelayLine, settings: ScanSettings,
                  on_point: Callable[[int, int, float, float], None] | None = None,
@@ -123,7 +123,7 @@ class Scan:
         self._stop = threading.Event()
         self.t = time_grid(settings.zones)
         for tt in (self.t[0], self.t[-1]):
-            delay.check(tt)  # lanza OutOfRange antes de empezar (CheckRange.vi)
+            delay.check(tt)  # raises OutOfRange before starting (CheckRange.vi)
         self.data = ScanData(self.t, np.full((settings.reps, len(self.t)), np.nan))
         self.info: dict = {}
 
@@ -159,7 +159,7 @@ class Scan:
                 actual_t[i] = tj
                 self.data.data_mV[rep, i] = v
                 self.on_point(rep, i, t, v)
-            if jitter_ps:  # deJitr.vi: reinterpolar a los retardos nominales
+            if jitter_ps:  # deJitr.vi: re-interpolate onto the nominal delays
                 self.data.data_mV[rep] = np.interp(self.t, actual_t, self.data.data_mV[rep])
             self.data.reps_done = rep + 1
             self.on_rep_done(self.data)

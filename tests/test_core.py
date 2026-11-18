@@ -22,14 +22,14 @@ def test_time_grid_log():
     t = time_grid([Zone(1, 100, 100, log=True)])
     assert t[0] == 1 and t[-1] == 100
     assert np.isclose(t[1] - t[0], 0.1)
-    assert np.all(np.diff(np.diff(t)[:-1]) > 0)  # pasos crecientes
+    assert np.all(np.diff(np.diff(t)[:-1]) > 0)  # increasing steps
 
 
 def test_delay_roundtrip_and_direction():
     d = DelayLine(t0_mm=-121.2, reversed=True, passes=1, min_mm=-150, max_mm=150)
     for t in (-5, 0, 3.7, 150):
         assert np.isclose(d.mm_to_ps(d.ps_to_mm(t)), t)
-    assert d.ps_to_mm(1) < d.t0_mm             # invertida: más retardo = menos mm
+    assert d.ps_to_mm(1) < d.t0_mm             # reversed: more delay = fewer mm
     assert np.isclose(d.t0_mm - d.ps_to_mm(1), 0.299792458 / 2)
     with pytest.raises(OutOfRange):
         d.check(1000)
@@ -69,7 +69,7 @@ def test_sim_scan_and_file_roundtrip(tmp_path):
 
 
 def test_xps_protocol():
-    """Servidor falso que imita al XPS."""
+    """Fake server that mimics the XPS."""
     srv = socket.socket()
     srv.bind(("127.0.0.1", 0))
     srv.listen(1)
@@ -94,7 +94,7 @@ def test_xps_protocol():
 
     threading.Thread(target=serve, daemon=True).start()
     x = XPS("127.0.0.1", port)
-    x.initialize_and_home()          # ya está Ready -> no inicializa
+    x.initialize_and_home()          # already Ready -> does not initialise
     assert x.position() == 12.5
     x.move_abs(1.25)
     assert log[-1] == "GroupMoveAbsolute(Group1.Pos,1.250000)"
@@ -105,7 +105,7 @@ def test_xps_protocol():
 
 
 class FakeSerial:
-    """Imita el puerto serie del SR810: contesta a las consultas terminando en CR."""
+    """Mimics the SR810 serial port: answers queries terminated by CR."""
 
     def __init__(self):
         self.written = b""
@@ -136,9 +136,9 @@ def test_sr810_over_rs232():
     t = SerialTransport.__new__(SerialTransport)
     t.ser, t.port = FakeSerial(), "COMtest"
     lia = SR810(t, invert=True)
-    assert t.ser.written.startswith(b"OUTX 0\r")          # respuestas por RS232
+    assert t.ser.written.startswith(b"OUTX 0\r")          # replies over RS232
     assert lia.idn().startswith("Stanford_Research_Systems,SR810")
-    assert lia.read_x() == 1.234e-3                       # con signo invertido
+    assert lia.read_x() == 1.234e-3                       # with inverted sign
     assert lia.get_sens() == 22 and lia.get_time_constant() == 0.1 and lia.get_freq() == 1000
     assert lia.set_sens("50 mV") is False and lia.set_sens("10 mV") is True
     assert t.ser.written.endswith(b"SENS 20\r")

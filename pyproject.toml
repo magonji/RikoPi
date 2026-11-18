@@ -1,7 +1,7 @@
 [project]
 name = "rikopi"
 version = "0.1.0"
-description = "Adquisición OKE (pump-probe con lock-in SR810 y stage Newport XPS). Sustituye a Riko v5 (LabVIEW)."
+description = "OKE data acquisition (pump-probe with an SR810 lock-in and a Newport XPS stage). Replaces Riko v5 (LabVIEW)."
 requires-python = ">=3.11"
 dependencies = [
     "numpy>=1.24",

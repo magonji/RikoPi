@@ -1,7 +1,7 @@
-"""RikoPi: control de un experimento OKE (pump-probe) en Python.
+"""RikoPi: control of an OKE (pump-probe) experiment in Python.
 
-Sustituye al programa Riko v5 de LabVIEW:
-  * stage de retardo Newport XPS (TCP/IP)
-  * lock-in Stanford Research SR810 (RS232)
+Replaces the Riko v5 LabVIEW program:
+  * Newport XPS delay stage (TCP/IP)
+  * Stanford Research SR810 lock-in amplifier (RS232)
 """
 __version__ = "0.1.0"

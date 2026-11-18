@@ -1,4 +1,4 @@
-"""Punto de entrada:  python -m rikopi [--sim] [--config ruta/config.toml]"""
+"""Entry point:  python -m rikopi [--sim] [--config path/config.toml]"""
 from __future__ import annotations
 
 import argparse
@@ -8,9 +8,9 @@ from . import config
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(prog="rikopi", description="Adquisición OKE (SR810 + Newport XPS)")
-    ap.add_argument("--sim", action="store_true", help="modo simulación, sin hardware")
-    ap.add_argument("--config", help="ruta a config.toml (por defecto, el de la carpeta del programa)")
+    ap = argparse.ArgumentParser(prog="rikopi", description="OKE data acquisition (SR810 + Newport XPS)")
+    ap.add_argument("--sim", action="store_true", help="simulation mode, no hardware")
+    ap.add_argument("--config", help="path to config.toml (default: the one in the program folder)")
     args = ap.parse_args()
     cfg = config.load(args.config)
     from .gui import run

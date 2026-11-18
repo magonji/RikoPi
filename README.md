@@ -1,92 +1,133 @@
-# RikoPi — adquisición OKE en Python
+# RikoPi — OKE data acquisition in Python
 
-Sustituye a **Riko v5.1** (LabVIEW): barrido pump-probe con la stage
-**Newport XPS** (TCP/IP) y el lock-in **SR810** (RS232).
-No hace falta ningún driver de National Instruments.
+Replaces **Riko v5.1** (LabVIEW): pump-probe delay scans using a **Newport XPS** stage (TCP/IP)
+and an **SR810** lock-in amplifier (RS232).
+No National Instruments drivers are needed.
 
-## Instalación (PC del laboratorio)
+## Installation (lab PC)
 
 1. Python ≥ 3.11.
-2. SR810 por RS232:
-   * Adaptador USB-RS232 (mejor con chip FTDI) y cable **recto** (no null-modem) DB9 → DB25:
-     el SR810 tiene un conector DB25 configurado como DCE.
-   * En el SR810: tecla **SETUP** → interfaz **RS232**, y elige los baudios (9600 o 19200).
-   * Mira qué puerto ha creado el adaptador (Windows: *Administrador de dispositivos* → `COMx`)
-     y ponlo en `config.toml` (`[lockin] port`, `baudrate`).
-   * Prueba la conexión: `python -m rikopi.instruments.sr810 COM3 9600` (sin argumentos lista los puertos).
-3. Red: el PC tiene que estar en la misma subred que el XPS (p.ej. IP fija `192.168.0.100`,
-   máscara `255.255.255.0`; el XPS está en `192.168.0.254`).
-4. Desde esta carpeta:
+2. Network: the PC must be on the same subnet as the XPS (e.g. static IP `192.168.0.100`,
+   netmask `255.255.255.0`; the XPS is at `192.168.0.254`).
+3. SR810 over RS232: see [Connecting the SR810 (FTDI USB-RS232 adapter)](#connecting-the-sr810-ftdi-usb-rs232-adapter).
+4. From this folder:
    ```
    python -m venv .venv
    .venv\Scripts\activate          (Windows)   |   source .venv/bin/activate   (Linux/Mac)
    pip install -e .
    ```
 
-## Uso
+## Connecting the SR810 (FTDI USB-RS232 adapter)
+
+FTDI-based adapters are the most reliable choice. Before starting RikoPi:
+
+1. **Driver**
+   * **Windows 10/11:** the driver installs itself when the adapter is plugged in (it can take a
+     minute). If no COM port appears, download the **VCP** driver from ftdichip.com.
+   * **Mac / Linux:** the driver is already built into the operating system.
+
+2. **Find the COM port**
+   On Windows: *Device Manager* → *Ports (COM & LPT)* → "USB Serial Port (COM**x**)". Put that
+   `COMx` in `config.toml`:
+   ```toml
+   [lockin]
+   port = "COM4"
+   ```
+   Windows ties the number to the adapter *and* the USB socket, so **always plug it into the same
+   USB socket**, otherwise the number may change. To fix the number: *Properties* →
+   *Port Settings* → *Advanced* → *COM Port Number*.
+
+3. **Optional: reduce the latency**
+   In the same *Advanced* window, set the **Latency Timer** to **1–2 ms** (the default is 16 ms).
+   The FTDI chip waits that long before passing each reply to the computer, so with 16 ms every
+   lock-in reading takes ~15 ms longer. With a 200 ms wait per point it hardly matters, but it
+   costs nothing.
+
+4. **Cable**
+   The SR810 has a **DB25** connector, and the adapter most likely ends in a **male DB9**.
+   You need a **straight-through (not null-modem) female DB9 → male DB25** cable or adapter: the
+   SR810 port is wired as DCE. With a null-modem cable the SR810 will never reply.
+
+5. **On the SR810**
+   Press **SETUP**, select the **RS232** interface and choose the baud rate (9600, or 19200), no
+   parity. Set the same value as `baudrate` in `config.toml`.
+
+6. **Test the connection** before starting the program:
+   ```
+   python -m rikopi.instruments.sr810           # lists the serial ports (the FTDI should appear)
+   python -m rikopi.instruments.sr810 COM4 9600 # should reply Stanford_Research_Systems,SR810,...
+   ```
+
+If it does not reply, check in this order: the cable (straight-through vs null-modem), the baud
+rate on the SR810 front panel, and the COM port number. If characters get lost or replies look
+garbled, try 9600 baud or set `rtscts = true` in `config.toml`.
+
+## Usage
 
 ```
-rikopi           # con hardware (según config.toml)
-rikopi --sim      # simulación, sin hardware
+rikopi           # with hardware (as set in config.toml)
+rikopi --sim     # simulation, no hardware
 ```
 
-Si al arrancar no encuentra los instrumentos, ofrece abrir en simulación (como Riko).
+If the instruments cannot be found at start-up, the program offers to open in simulation mode
+(as Riko did).
 
-* **Barrido**: zonas de retardo (inicio, fin, paso; *Log* = paso creciente geométricamente, el paso
-  indicado es el primero), tabla de sensibilidades por tramos de retardo, repeticiones, espera
-  por punto, jitter. Se guarda el fichero completo al final de cada repetición (nunca se sobrescribe:
-  si existe, se añade `_2`, `_3`…). *Ajustar autocorrelación* (sech² o gauss) da t0 y la duración
-  del pulso, y *Usar como t0* corrige el cero de tiempos.
-* **Stage / Scope**: posición en mm y ps, ir a una posición, fijar t0, sensibilidad del lock-in,
-  lectura continua de X y movimiento adelante/atrás para alinear.
+* **Scan**: delay zones (start, end, step; *Log* = geometrically increasing step, where the step
+  given is the first one), lock-in sensitivity table by delay range, repeats, wait per point and
+  jitter. The whole file is saved at the end of every repeat (never overwritten: if it exists,
+  `_2`, `_3`… is appended). *Fit autocorrelation* (sech² or Gaussian) gives t0 and the pulse
+  duration, and *Use as t0* corrects time zero.
+* **Stage / Scope**: position in mm and ps, move to a position, set t0, lock-in sensitivity,
+  continuous reading of X, and back-and-forth stage motion for alignment.
 
-Al cerrar se guardan los ajustes y el t0 en `state.json`.
+On closing, the settings and t0 are saved in `state.json`.
 
-## Configuración (`config.toml`)
+## Configuration (`config.toml`)
 
-Equivalencias con `Riko v5.ini`: `XPSaddr → stage.host`, `Axis = Group1/- → group = "Group1"` +
-`reversed = true`, `/x2 → passes = 2`, y el SR810, que antes iba por GPIB (`SR810addr = 12`), ahora va por RS232 (`lockin.port`).
+Equivalences with `Riko v5.ini`: `XPSaddr → stage.host`, `Axis = Group1/- → group = "Group1"` +
+`reversed = true`, `/x2 → passes = 2`. The SR810, which used to be on GPIB (`SR810addr = 12`), is
+now on RS232 (`lockin.port`).
 
-**Antes de medir, comprueba:**
-- `positioner`: nombre del posicionador en el XPS (en la web del XPS). Suele ser `Group1.Pos`.
-- `t0_mm`: **hay que recalibrarlo** (el `t00` del .ini no se puede traducir con seguridad porque no
-  está claro cómo combinaba LabVIEW el signo con el `/-`). Lo más fácil: barrido corto alrededor de
-  la autocorrelación → *Ajustar* → *Usar como t0*.
-- Las sensibilidades del .ini (`Sens0=8`…) eran índices de un menú de LabVIEW; en RikoPi se eligen
-  directamente por valor (`50 mV`, etc.).
-
-## Formato de datos
-
-Texto con cabecera `#` y columnas separadas por tabuladores: `t_fs rep1 … repN avg` (mV).
-```python
-import numpy as np
-d = np.loadtxt("fichero.dat")         # d[:,0] = t (fs), d[:,-1] = media
-from rikopi import datafile
-t_ps, reps, meta = datafile.read("fichero.dat")   # meta = todos los ajustes del barrido
-```
-
-## Estructura
-
-| Módulo | Sustituye a |
-|---|---|
-| `rikopi/instruments/sr810.py` | SR810startup/readX/sens/timeconst/freq.vi |
-| `rikopi/instruments/xps.py` | XPSstartup/init/home/getPosn, MotoMove, TCPwrtrd.vi |
-| `rikopi/delay.py` | conversión mm ↔ ps de MotoMove/CheckRange.vi |
-| `rikopi/scan.py` | bucle de Riko + Smpl, Jitr, deJitr, zonas |
-| `rikopi/datafile.py` | FilePrep, xXYYheader, MakexXlgYYYarray.vi |
-| `rikopi/fit.py` | CorrFit.vi |
-| `rikopi/gui.py` | panel frontal de Riko |
-
-Tests: `pip install -e ".[test]" && pytest`.
+**Before measuring, check:**
+- `positioner`: the positioner name on the XPS (see the XPS web interface). Usually `Group1.Pos`.
+- `t0_mm`: **must be recalibrated** (the `t00` in the .ini cannot be converted reliably, as it is
+  unclear how LabVIEW combined its sign with the `/-`). The easiest way: a short scan around the
+  autocorrelation → *Fit* → *Use as t0*.
+- The sensitivities in the .ini (`Sens0=8`…) were indices into a LabVIEW menu; in RikoPi they are
+  chosen directly by value (`50 mV`, etc.).
 
 ## Chopper
 
-`[chopper]` en `config.toml`, como SR810slowChop.vi: 10 min después de terminar un barrido, la
-referencia del SR810 baja a 120 Hz. Al empezar el siguiente barrido (o el scope) se restaura la
-frecuencia anterior y se espera `spinup_s` a que el chopper recupere la velocidad. Se puede
-desactivar con la casilla de la pestaña Barrido.
+`[chopper]` in `config.toml`, as in SR810slowChop.vi: 10 min after a scan finishes, the SR810
+reference frequency is lowered to 120 Hz. When the next scan (or the scope) starts, the previous
+frequency is restored and the program waits `spinup_s` for the chopper to get back up to speed.
+It can be switched off with the tick box on the Scan tab.
 
-## No portado
+## Data format
 
-OKEdoke (análisis). Tampoco el Nanomover MGn2, el boxcar + NI-DAQ, las cámaras (SXVR-H9, IMAQdx),
-el ITC503 ni el ASG, que ya no se usan en el laboratorio.
+Plain text with a `#` header and tab-separated columns: `t_fs rep1 … repN avg` (mV).
+```python
+import numpy as np
+d = np.loadtxt("file.dat")            # d[:,0] = t (fs), d[:,-1] = average
+from rikopi import datafile
+t_ps, reps, meta = datafile.read("file.dat")   # meta = all the scan settings
+```
+
+## Structure
+
+| Module | Replaces |
+|---|---|
+| `rikopi/instruments/sr810.py` | SR810startup/readX/sens/timeconst/freq.vi |
+| `rikopi/instruments/xps.py` | XPSstartup/init/home/getPosn, MotoMove, TCPwrtrd.vi |
+| `rikopi/delay.py` | mm ↔ ps conversion from MotoMove/CheckRange.vi |
+| `rikopi/scan.py` | Riko main loop + Smpl, Jitr, deJitr, zones |
+| `rikopi/datafile.py` | FilePrep, xXYYheader, MakexXlgYYYarray.vi |
+| `rikopi/fit.py` | CorrFit.vi |
+| `rikopi/gui.py` | Riko front panel |
+
+Tests: `pip install -e ".[test]" && pytest`.
+
+## Not ported
+
+OKEdoke (analysis). Nor the MGn2 Nanomover, the boxcar + NI-DAQ, the cameras (SXVR-H9, IMAQdx),
+the ITC503 or the ASG, which are no longer used in the lab.

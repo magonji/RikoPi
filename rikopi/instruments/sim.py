@@ -1,4 +1,4 @@
-"""Instrumentos simulados, para probar el programa sin hardware (como el modo 'Simulate' de Riko)."""
+"""Simulated instruments, to try the program without hardware (like Riko's 'Simulate' mode)."""
 from __future__ import annotations
 
 import math
@@ -38,12 +38,12 @@ class SimXPS:
 
 
 class SimSR810:
-    """Devuelve una señal OKE sintética (pico de autocorrelación + respuesta nuclear) según la posición
-    de la stage simulada."""
+    """Returns a synthetic OKE signal (autocorrelation peak + nuclear response) depending on the
+    position of the simulated stage."""
 
     def __init__(self, stage: SimXPS, delay, noise_mV: float = 0.05, invert: bool = False):
         self.stage = stage
-        self.delay = delay  # rikopi.delay.DelayLine (para convertir mm -> ps)
+        self.delay = delay  # rikopi.delay.DelayLine (to convert mm -> ps)
         self.noise = noise_mV
         self.invert = invert
         self._sens = 22
@@ -51,7 +51,7 @@ class SimSR810:
 
     @staticmethod
     def signal_mV(t: float) -> float:
-        tau = 0.06  # ps, parámetro sech de un pulso de ~100 fs
+        tau = 0.06  # ps, sech parameter of a ~100 fs pulse
         x = t / tau
         ac = 1.0 if abs(x) < 1e-3 else 3 * (x / math.tanh(x) - 1) / math.sinh(x) ** 2 if abs(x) < 300 else 0.0
         nuclear = (t > 0) * (1 - math.exp(-2 * t)) * math.exp(-((abs(t) / 10) ** 0.5)) / 3
@@ -63,7 +63,7 @@ class SimSR810:
     def read_x(self):
         t = self.delay.mm_to_ps(self.stage.position())
         v = (self.signal_mV(t) + random.gauss(0, self.noise)) * 1e-3
-        v = max(-SENSITIVITIES_V[self._sens], min(SENSITIVITIES_V[self._sens], v))  # saturación
+        v = max(-SENSITIVITIES_V[self._sens], min(SENSITIVITIES_V[self._sens], v))  # saturation
         return -v if self.invert else v
 
     def get_sens(self):

@@ -1,9 +1,9 @@
-"""Driver mínimo para el controlador Newport XPS por TCP/IP.
+"""Minimal driver for the Newport XPS controller over TCP/IP.
 
-Sustituye a los VIs XPSstartup / XPSinit / XPShome / XPSgetPosn / MotoMove / TCPwrtrd.
-El XPS acepta llamadas de función en texto (puerto 5001), p.ej.
+Replaces the VIs XPSstartup / XPSinit / XPShome / XPSgetPosn / MotoMove / TCPwrtrd.
+The XPS accepts function calls as text (port 5001), e.g.
     GroupMoveAbsolute(Group1.Pos,12.5)
-y contesta con "<código>,<valores...>,EndOfAPI". Código 0 = OK.
+and replies with "<code>,<values...>,EndOfAPI". Code 0 = OK.
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ class XPSError(RuntimeError):
     pass
 
 
-# Estados de GroupStatusGet relevantes
+# Relevant GroupStatusGet states
 READY_STATES = set(range(10, 19))  # 10..18 = Ready (from homing, motion, ...)
 NOT_INIT_STATES = set(range(0, 10)) | {50, 63, 64, 65, 66, 67, 71, 72}
 NOT_REFERENCED = 42
@@ -32,7 +32,7 @@ class XPS:
         self.sock = socket.create_connection((host, port), timeout=5)
         self.sock.settimeout(timeout_s)
 
-    # --- protocolo ---
+    # --- protocol ---
     def _call(self, cmd: str) -> list[str]:
         with self._lock:
             self.sock.sendall(cmd.encode("ascii"))
@@ -40,7 +40,7 @@ class XPS:
             while b"EndOfAPI" not in buf:
                 chunk = self.sock.recv(4096)
                 if not chunk:
-                    raise XPSError(f"conexión cerrada por el XPS durante '{cmd}'")
+                    raise XPSError(f"connection closed by the XPS during '{cmd}'")
                 buf += chunk
         reply = buf.decode("ascii", errors="replace").split("EndOfAPI")[0].strip().rstrip(",")
         parts = [p.strip() for p in reply.split(",")]
@@ -63,12 +63,12 @@ class XPS:
     def close(self) -> None:
         self.sock.close()
 
-    # --- funciones ---
+    # --- functions ---
     def status(self) -> int:
         return int(self._call(f"GroupStatusGet({self.group},int *)")[0])
 
     def initialize_and_home(self) -> None:
-        """Equivalente a XPSstartup: inicializa y hace homing sólo si hace falta."""
+        """Equivalent to XPSstartup: initialises and homes only if needed."""
         st = self.status()
         if st in READY_STATES:
             return
@@ -79,13 +79,13 @@ class XPS:
             self._call(f"GroupHomeSearch({self.group})")
         st = self.status()
         if st not in READY_STATES:
-            raise XPSError(f"el grupo {self.group} no está listo (estado {st})")
+            raise XPSError(f"group {self.group} is not ready (state {st})")
 
     def position(self) -> float:
         return float(self._call(f"GroupPositionCurrentGet({self.positioner},double *)")[0])
 
     def move_abs(self, mm: float) -> None:
-        """Movimiento absoluto bloqueante (el XPS contesta al terminar el movimiento)."""
+        """Blocking absolute move (the XPS replies when the move has finished)."""
         self._call(f"GroupMoveAbsolute({self.positioner},{mm:.6f})")
 
     def travel_limits(self) -> tuple[float, float]:
@@ -93,7 +93,7 @@ class XPS:
         return float(lo), float(hi)
 
     def set_velocity(self, velocity: float, acceleration: float) -> None:
-        """Equivalente a XPSsetparams (PositionerSGammaParametersSet)."""
+        """Equivalent to XPSsetparams (PositionerSGammaParametersSet)."""
         cur = self._call(f"PositionerSGammaParametersGet({self.positioner},double *,double *,double *,double *)")
         jmin, jmax = cur[2], cur[3]
         self._call(f"PositionerSGammaParametersSet({self.positioner},{velocity},{acceleration},{jmin},{jmax})")
